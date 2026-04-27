@@ -7,18 +7,19 @@ st.title("📊 Nayanam Analytics Dashboard")
 
 import os
 
-# ===============================
-# AUTO LOAD DATA (ROBUST VERSION)
-# ===============================
 file_path = "orders.xlsx"
 
 if not os.path.exists(file_path):
-    st.error("❌ orders.xlsx not found in deployed app")
+    st.error("❌ orders.xlsx not found")
     st.stop()
 
-df = pd.read_excel(file_path)
-df.columns = df.columns.str.strip()
+try:
+    df = pd.read_excel(file_path, engine="openpyxl")
+except:
+    st.error("❌ Excel read failed - dependency issue")
+    st.stop()
 
+df.columns = df.columns.str.strip()
 st.success("✅ Data Loaded Successfully")
 
 # ===============================
