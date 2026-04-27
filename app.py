@@ -1,38 +1,46 @@
 import streamlit as st
 import pandas as pd
 
+st.set_page_config(page_title="Nayanam Dashboard", layout="wide")
+
 st.title("📊 Nayanam Analytics Dashboard")
 
-uploaded_file = st.file_uploader("Upload Order Report", type=["xlsx"])
+# ===============================
+# FILE UPLOAD
+# ===============================
+uploaded_file = st.file_uploader("Upload Order Report (Excel)", type=["xlsx"])
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-# --- CLEAN ---
+# ===============================
+# STOP IF NO FILE
+# ===============================
+if uploaded_file is None:
+    st.info("👆 Please upload your Excel file to view dashboard")
+    st.stop()
+
+# ===============================
+# LOAD DATA
+# ===============================
+df = pd.read_excel(uploaded_file)
 df.columns = df.columns.str.strip()
 
+# ===============================
+# CLEAN DATA
+# ===============================
 if "Grand Total (₹)" in df.columns:
     df = df.rename(columns={"Grand Total (₹)": "Total"})
 
-# --- DATE FIX ---
-if "Created" in df.columns:
-    df["Created"] = pd.to_datetime(df["Created"], errors="coerce", dayfirst=True)
+df["Total"] = pd.to_numeric(df["Total"], errors="coerce")
+
+# Fill delivery blanks
+if "Delivery Boy" in df.columns:
+    df["Delivery Boy"] = df["Delivery Boy"].fillna("Unknown")
+
+# ===============================
+# FILTERS
+# ===============================
 st.sidebar.header("🔍 Filters")
 
-# Date filter
-if "Created" in df.columns:
-    min_date = df["Created"].min()
-    max_date = df["Created"].max()
-
-    date_range = st.sidebar.date_input(
-        "Select Date Range",
-        [min_date, max_date]
-    )
-
-    if len(date_range) == 2:
-        start_date, end_date = date_range
-        df = df[(df["Created"].dt.date >= start_date) & (df["Created"].dt.date <= end_date)]
-
-# Payment filter
+# Payment Filter
 if "Payment Type" in df.columns:
     payment_filter = st.sidebar.multiselect(
         "Payment Type",
@@ -41,7 +49,7 @@ if "Payment Type" in df.columns:
     if payment_filter:
         df = df[df["Payment Type"].isin(payment_filter)]
 
-# Status filter
+# Status Filter
 if "Status" in df.columns:
     status_filter = st.sidebar.multiselect(
         "Order Status",
@@ -49,25 +57,11 @@ if "Status" in df.columns:
     )
     if status_filter:
         df = df[df["Status"].isin(status_filter)]
-item_file = st.file_uploader("Upload Item Report (Optional)", type=["xlsx"])
-if item_file:
-    items = pd.read_excel(item_file)
-    items.columns = items.columns.str.strip()
 
-    items = items.rename(columns={
-        "Quantity": "Qty",
-        "Total Amount": "Total"
-    })
-
-    st.subheader("🍽️ Item Analysis")
-
-    top_items = items.groupby("Item Name")["Qty"].sum().sort_values(ascending=False).head(5)
-    st.write("Top Items")
-    st.bar_chart(top_items)
-
-    low_items = items.groupby("Item Name")["Qty"].sum().sort_values().head(5)
-    st.write("Low Items")
-    st.bar_chart(low_items)
+# ===============================
+# SUMMARY
+# ===============================
+st.subheader("📊 Summary")
 
 col1, col2, col3 = st.columns(3)
 
@@ -75,104 +69,87 @@ col1.metric("💰 Total Sales", f"₹{df['Total'].sum():,.0f}")
 col2.metric("🧾 Orders", len(df))
 col3.metric("📊 Avg Order", f"₹{df['Total'].mean():.2f}")
 
-if "Created" in df.columns:
-    st.subheader("📈 Sales Trend")
+# ===============================
+# PAYMENT ANALYSIS
+# ===============================
+if "Payment Type" in df.columns:
+    st.subheader("💳 Payment Split")
+    pay = df.groupby("Payment Type")["Total"].sum()
+    st.bar_chart(pay)
 
-    trend = df.groupby(df["Created"].dt.date)["Total"].sum()
-    st.line_chart(trend)
+# ===============================
+# DELIVERY ANALYSIS
+# ===============================
+if "Delivery Boy" in df.columns:
+    st.subheader("🚴 Delivery Boy Performance")
+
+    delivery = (
+        df.groupby("Delivery Boy")["Total"]
+        .agg(["sum", "count"])
+        .rename(columns={"sum": "Sales", "count": "Orders"})
+        .sort_values(by="Sales", ascending=False)
+    )
+
+    st.dataframe(delivery)
+
+# ===============================
+# ORDER TYPE
+# ===============================
 if "Order Type" in df.columns:
-    st.subheader("🍽️ Order Type Split")
+    st.subheader("🍽️ Order Type")
     order_type = df["Order Type"].value_counts()
     st.bar_chart(order_type)
 
-    df.columns = df.columns.str.strip()
+# ===============================
+# STATUS
+# ===============================
+if "Status" in df.columns:
+    st.subheader("📦 Order Status")
+    status = df["Status"].value_counts()
+    st.bar_chart(status)
 
-    if "Grand Total (₹)" in df.columns:
-        df = df.rename(columns={"Grand Total (₹)": "Total"})
+# ===============================
+# FINANCIALS
+# ===============================
+st.subheader("💸 Financials")
 
-    # Summary
-    st.subheader("📊 Summary")
-    total_sales = df["Total"].sum()
-    total_orders = len(df)
-    avg_order = df["Total"].mean()
+col4, col5, col6 = st.columns(3)
 
-    st.metric("Total Sales", f"₹{total_sales:,.0f}")
-    st.metric("Total Orders", total_orders)
-    st.metric("Avg Order Value", f"₹{avg_order:.2f}")
+if "Total Discount (₹)" in df.columns:
+    col4.metric("Discount", f"₹{df['Total Discount (₹)'].sum():,.0f}")
 
-    # Payment Split
-    if "Payment Type" in df.columns:
-        st.subheader("💳 Payment Split")
-        pay = df.groupby("Payment Type")["Total"].sum()
-        st.bar_chart(pay)
+if "Total Tax (₹)" in df.columns:
+    col5.metric("Tax", f"₹{df['Total Tax (₹)'].sum():,.0f}")
 
-    # Ask Question
-    st.subheader("🤖 Ask a Question")
-    query = st.text_input("Ask anything (e.g., total, payment, status, delivery boy)")
+if "Delivery Charge (₹)" in df.columns and "Container Charge (₹)" in df.columns:
+    charges = df["Delivery Charge (₹)"].sum() + df["Container Charge (₹)"].sum()
+    col6.metric("Charges", f"₹{charges:,.0f}")
+
+# ===============================
+# ASK SECTION
+# ===============================
+st.subheader("🤖 Quick Query")
+
+query = st.text_input("Try: total / delivery / payment")
 
 if query:
-    query = query.lower()
+    q = query.lower()
 
-    if "total" in query:
-        st.success(f"Total Sales: ₹{total_sales:,.0f}")
+    if "total" in q:
+        st.success(f"₹{df['Total'].sum():,.0f}")
 
-    elif "orders" in query:
-        st.success(f"Total Orders: {total_orders}")
+    elif "delivery" in q:
+        st.dataframe(delivery)
 
-    elif "average" in query:
-        st.success(f"Average Order Value: ₹{avg_order:.2f}")
-
-    elif "payment" in query:
-        if "Payment Type" in df.columns:
-            pay = df.groupby("Payment Type")["Total"].sum()
-            st.write(pay)
-
-    elif "status" in query:
-        if "Status" in df.columns:
-            st.write(df["Status"].value_counts())
-
-    elif "delivery" in query:
-        if "Delivery Boy" in df.columns:
-            st.write(df["Delivery Boy"].value_counts())
-
-    elif "order type" in query:
-        if "Order Type" in df.columns:
-            st.write(df["Order Type"].value_counts())
-
-    elif "discount" in query:
-        if "Total Discount (₹)" in df.columns:
-            st.write(f"Total Discount: ₹{df['Total Discount (₹)'].sum():,.0f}")
-
-    elif "show data" in query:
-        st.dataframe(df)
+    elif "payment" in q:
+        st.write(pay)
 
     else:
-        st.warning("Try: total / orders / payment / status / delivery / order type / discount / show data")
+        st.warning("Try: total / delivery / payment")
 
-import urllib.parse
-
-st.subheader("📤 Send Report to WhatsApp")
-
-# Generate message
-message = f"""
-📊 NAYANAM DAILY REPORT
-
-💰 Total Sales: ₹{df['Total'].sum():,.0f}
-🧾 Orders: {len(df)}
-📊 Avg Order: ₹{df['Total'].mean():.2f}
-"""
-
-# Payment split
-if "Payment Type" in df.columns:
-    pay = df.groupby("Payment Type")["Total"].sum()
-    message += "\n💳 Payment Split:\n" + pay.to_string()
-
-# Encode message
-encoded_message = urllib.parse.quote(message)
-
-# 👉 Replace number
-phone_number = "91XXXXXXXXXX"
-
-whatsapp_url = f"https://wa.me/{phone_number}?text={encoded_message}"
-
-st.link_button("📲 Send to WhatsApp", whatsapp_url)
+# ===============================
+# EXPORT
+# ===============================
+if st.button("📤 Export Data"):
+    df.to_excel("output.xlsx", index=False)
+    st.success("Downloaded as output.xlsx")
