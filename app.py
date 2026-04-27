@@ -6,22 +6,15 @@ st.set_page_config(page_title="Nayanam Dashboard", layout="wide")
 st.title("📊 Nayanam Analytics Dashboard")
 
 # ===============================
-# FILE UPLOAD
+# AUTO LOAD DATA
 # ===============================
-uploaded_file = st.file_uploader("Upload Order Report (Excel)", type=["xlsx"])
-
-# ===============================
-# STOP IF NO FILE
-# ===============================
-if uploaded_file is None:
-    st.info("👆 Please upload your Excel file to view dashboard")
+try:
+    df = pd.read_excel("orders.xlsx")
+    df.columns = df.columns.str.strip()
+    st.success("✅ Data Loaded Successfully")
+except:
+    st.error("❌ orders.xlsx not found in repository")
     st.stop()
-
-# ===============================
-# LOAD DATA
-# ===============================
-df = pd.read_excel(uploaded_file)
-df.columns = df.columns.str.strip()
 
 # ===============================
 # CLEAN DATA
@@ -31,12 +24,11 @@ if "Grand Total (₹)" in df.columns:
 
 df["Total"] = pd.to_numeric(df["Total"], errors="coerce")
 
-# Fill delivery blanks
 if "Delivery Boy" in df.columns:
     df["Delivery Boy"] = df["Delivery Boy"].fillna("Unknown")
 
 # ===============================
-# FILTERS
+# SIDEBAR FILTERS
 # ===============================
 st.sidebar.header("🔍 Filters")
 
@@ -81,7 +73,7 @@ if "Payment Type" in df.columns:
 # DELIVERY ANALYSIS
 # ===============================
 if "Delivery Boy" in df.columns:
-    st.subheader("🚴 Delivery Boy Performance")
+    st.subheader("🚴 Delivery Performance")
 
     delivery = (
         df.groupby("Delivery Boy")["Total"]
@@ -126,7 +118,7 @@ if "Delivery Charge (₹)" in df.columns and "Container Charge (₹)" in df.colu
     col6.metric("Charges", f"₹{charges:,.0f}")
 
 # ===============================
-# ASK SECTION
+# QUICK QUERY
 # ===============================
 st.subheader("🤖 Quick Query")
 
