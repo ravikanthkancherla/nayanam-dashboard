@@ -5,16 +5,21 @@ st.set_page_config(page_title="Nayanam Dashboard", layout="wide")
 
 st.title("📊 Nayanam Analytics Dashboard")
 
+import os
+
 # ===============================
-# AUTO LOAD DATA
+# AUTO LOAD DATA (ROBUST VERSION)
 # ===============================
-try:
-    df = pd.read_excel("orders.xlsx")
-    df.columns = df.columns.str.strip()
-    st.success("✅ Data Loaded Successfully")
-except:
-    st.error("❌ orders.xlsx not found in repository")
+file_path = "orders.xlsx"
+
+if not os.path.exists(file_path):
+    st.error("❌ orders.xlsx not found in deployed app")
     st.stop()
+
+df = pd.read_excel(file_path)
+df.columns = df.columns.str.strip()
+
+st.success("✅ Data Loaded Successfully")
 
 # ===============================
 # CLEAN DATA
