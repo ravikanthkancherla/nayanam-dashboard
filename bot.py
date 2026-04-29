@@ -1,194 +1,118 @@
 import pandas as pd
 from datetime import datetime, timedelta
 
-# =========================
-# DISPLAY SETTINGS
-# =========================
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', 2000)
-pd.set_option('display.expand_frame_repr', False)
+FILE = "nayanam_data.xlsx"
 
-print("🚀 Nayanam Analytics Engine (Clean Version)")
+def fmt(x):
+    try:
+        return f"₹{x:,.0f}"
+    except:
+        return x
 
-# =========================
-# LOAD DATA
-# =========================
-try:
-    df = pd.read_excel("orders.xlsx")
-    df.columns = df.columns.str.strip()
-except:
-    print("❌ orders.xlsx not found")
-    exit()
+def load_data():
+    df = pd.read_excel(FILE)
 
-# =========================
-# CLEAN DATA
-# =========================
-if "Grand Total (₹)" in df.columns:
-    df = df.rename(columns={"Grand Total (₹)": "Total"})
-else:
-    print("❌ Grand Total column missing")
-    exit()
+    df["Created"] = pd.to_datetime(df.get("Created"), errors="coerce")
+    df["Total"] = pd.to_numeric(df.get("Total"), errors="coerce")
 
-df["Total"] = pd.to_numeric(df["Total"], errors="coerce")
+    if "Sub Order Type" not in df.columns:
+        df["Sub Order Type"] = df.get("Order Type", "Dine-In")
 
-if "Created" in df.columns:
-    df["Created"] = pd.to_datetime(df["Created"], errors="coerce", dayfirst=True)
+    df["Delivery Boy"] = df.get("Delivery Boy", "Unknown")
 
-df["Delivery Boy"] = df.get("Delivery Boy", "Unknown").fillna("Unknown")
+    return df
 
-# =========================
-# FILTER MODULE
-# =========================
-def apply_filters(data, query):
-    if "today" in query:
-        return data[data["Created"].dt.date == datetime.now().date()]
+def apply_date_filter(df, mode):
 
-    elif "yesterday" in query:
-        y = (datetime.now() - timedelta(days=1)).date()
-        return data[data["Created"].dt.date == y]
+    if mode == "today":
+        return df[df["Created"].dt.date == datetime.today().date()]
 
-    return data
+    if mode == "yesterday":
+        return df[df["Created"].dt.date == (datetime.today() - timedelta(days=1)).date()]
 
+    try:
+        d = datetime.strptime(mode, "%d-%m-%Y").date()
+        return df[df["Created"].dt.date == d]
+    except:
+        pass
 
-# =========================
-# ANALYTICS MODULES
-# =========================
+    try:
+        m = datetime.strptime(mode, "%m-%Y")
+        return df[
+            (df["Created"].dt.month == m.month) &
+            (df["Created"].dt.year == m.year)
+        ]
+    except:
+        pass
 
-def summary(data):
-    return f"""
-📊 SUMMARY
-💰 Sales: ₹{data['Total'].sum():,.0f}
-🧾 Orders: {len(data)}
-📊 Avg Order: ₹{data['Total'].mean():.2f}
-"""
+    return df
 
+def sales_location(df, outlet, date_mode):
 
-def delivery_analysis(data):
-    result = data.groupby("Delivery Boy")["Total"].agg(["sum", "count"])
-    result.columns = ["Sales", "Orders"]
-    return "\n🚴 Delivery Performance:\n" + result.sort_values(by="Sales", ascending=False).to_string()
+    df = df[df["Outlet"] == outlet]
+    df = apply_date_filter(df, date_mode)
 
+    if df.empty:
+        return "❌ No data"
 
-def payment_analysis(data):
-    if "Payment Type" not in data.columns:
-        return "No payment data"
-    return "\n💳 Payment Split:\n" + data.groupby("Payment Type")["Total"].sum().to_string()
+    total = df["Total"].sum()
+    orders = len(df)
+    aov = total / orders if orders else 0
 
+    split = df.groupby("Sub Order Type")["Total"].sum()
+    pct = (split / total * 100).round(1)
 
-def status_analysis(data):
-    return "\n📦 Status:\n" + data["Status"].value_counts().to_string()
+    text = f"📊 {outlet} SALES ({date_mode.upper()})\n\n"
+    text += f"💰 {fmt(total)} | 📦 {orders} | AOV {fmt(aov)}\n\n"
 
+    for k in split.index:
+        text += f"{k} → {fmt(split[k])} ({pct[k]}%)\n"
 
-def order_type_analysis(data):
-    return "\n🍽️ Order Type:\n" + data["Order Type"].value_counts().to_string()
+    return text
 
+def staff_location(df, outlet, date_mode):
 
-def financials(data):
-    return f"""
-💸 Discount: ₹{data['Total Discount (₹)'].sum():,.0f}
-🧾 Tax: ₹{data['Total Tax (₹)'].sum():,.0f}
-📦 Charges: ₹{data['Delivery Charge (₹)'].sum() + data['Container Charge (₹)'].sum():,.0f}
-"""
+    df = df[df["Outlet"] == outlet]
+    df = apply_date_filter(df, date_mode)
 
+    if df.empty:
+        return "❌ No data"
 
-def hourly_sales(data):
-    if "Created" not in data.columns:
-        return "No time data"
-    data["Hour"] = data["Created"].dt.hour
-    return "\n⏰ Hourly Sales:\n" + data.groupby("Hour")["Total"].sum().to_string()
+    df["WorkDate"] = df["Created"].dt.date
+    days = df.groupby("Delivery Boy")["WorkDate"].nunique()
 
+    temp = df.groupby("Delivery Boy").agg(
+        Sales=("Total", "sum"),
+        Orders=("Total", "count")
+    )
 
-def customer_search(data, query):
-    name = query.replace("customer", "").strip()
-    return data[data["Customer Name"].str.contains(name, case=False, na=False)].to_string(index=False)
+    temp["AOV"] = temp["Sales"] / temp["Orders"]
+    temp["Days"] = days
 
+    max_sales = temp["Sales"].max()
+    max_orders = temp["Orders"].max()
 
-def phone_search(data, query):
-    num = query.replace("phone", "").strip()
-    return data[data["Customer Phone"].astype(str).str.contains(num)].to_string(index=False)
+    temp["Score"] = (
+        (temp["Sales"] / max_sales * 50) +
+        (temp["Orders"] / max_orders * 30) +
+        (temp["Days"] / temp["Days"].max() * 20)
+    ).round(0)
 
+    def tag(score):
+        if score >= 80:
+            return "⭐ Star"
+        elif score >= 60:
+            return "👍 Good"
+        else:
+            return "⚠️ Improve"
 
-def order_search(data, query):
-    num = query.replace("order", "").strip()
-    return data[data["Order No."].astype(str).str.contains(num)].to_string(index=False)
+    temp["Tag"] = temp["Score"].apply(tag)
 
+    sorted_df = temp.sort_values("Score", ascending=False)
 
-# =========================
-# MAIN QUERY ENGINE
-# =========================
-def get_summary(query):
-    query = query.lower().strip()
+    text = f"👨‍💼 {outlet} CAPTAIN ({date_mode.upper()})\n\n"
 
-    data = apply_filters(df, query)
+    for i, r in sorted_df.iterrows():
+        text += f"{i} → {fmt(r['Sales'])} | {int(r['Orders'])} | {int(r['Days'])}d | {r['Tag']}\n"
 
-    if "summary" in query or "total" in query:
-        return summary(data)
-
-    elif "delivery" in query:
-        return delivery_analysis(data)
-
-    elif "payment" in query:
-        return payment_analysis(data)
-
-    elif "status" in query:
-        return status_analysis(data)
-
-    elif "order type" in query:
-        return order_type_analysis(data)
-
-    elif "financial" in query or "tax" in query or "discount" in query:
-        return financials(data)
-
-    elif "hour" in query:
-        return hourly_sales(data)
-
-    elif "customer" in query:
-        return customer_search(data, query)
-
-    elif "phone" in query:
-        return phone_search(data, query)
-
-    elif "order " in query:
-        return order_search(data, query)
-
-    elif "show" in query:
-        return data.head(50).to_string(index=False)
-
-    elif "columns" in query:
-        return "\n".join(data.columns)
-
-    elif "export" in query:
-        data.to_excel("output.xlsx", index=False)
-        return "✅ Exported as output.xlsx"
-
-    else:
-        return """
-Try:
-summary / total
-delivery / delivery today
-payment
-status
-order type
-financial
-hour
-customer ravi
-phone 9876
-order 123
-show
-export
-"""
-
-
-# =========================
-# LOOP
-# =========================
-print("\n✅ Ready 🚀 (type 'exit')")
-
-while True:
-    q = input("\nAsk: ")
-    if q.lower() == "exit":
-        break
-
-    print("\n" + "-"*80)
-    print(get_summary(q))
-    print("-"*80)
+    return text
