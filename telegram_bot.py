@@ -1,113 +1,183 @@
 import os
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-from bot import load_data, sales_location, staff_location
-import os
+# ==============================
+# CONFIG
+# ==============================
+
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-ALLOWED_USERS = {
-    8583468705: "admin",
-    807377060: "user"
-}
+LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 
 user_state = {}
 
-def main_menu():
-    return ReplyKeyboardMarkup(
-        [["📊 Sales", "👨‍💼 Captain"],
-         ["👤 Employee Details"]],
-        resize_keyboard=True
-    )
+# ==============================
+# DUMMY FUNCTIONS (REPLACE WITH YOUR LOGIC)
+# ==============================
+
+def sales_location(location, date="today"):
+    return f"""📊 {location} SALES
+
+Date: {date}
+
+💰 Total Sales: ₹1,25,000
+🧾 Orders: 320
+📦 AOV: ₹390
+
+📌 Sub Order Type:
+Dine-In: 60%
+Delivery: 30%
+Takeaway: 10%
+"""
+
+def staff_location(location):
+    return f"""📍 {location} STAFF PERFORMANCE
+
+🏆 Top Performers:
+KRISHNA → ₹1,20,000
+ROHIT → ₹82,000
+
+⚠️ Low Performers:
+RAMESH → ₹29,000
+PRAKASH → ₹18,000
+"""
+
+# ==============================
+# HANDLERS
+# ==============================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        ["📊 Sales", "👨‍🍳 Captain"],
+        ["📦 Purchase Info", "📈 P&L"],
+        ["👤 Employee Details"]
+    ]
 
-    if update.message.from_user.id not in ALLOWED_USERS:
-        await update.message.reply_text("❌ Not authorized")
-        return
-
-    await update.message.reply_text("📊 Nayanam Bot", reply_markup=main_menu())
+    await update.message.reply_text(
+        "📊 *Nayanam Intelligence Bot*\nSelect an option:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
+        parse_mode="Markdown"
+    )
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+    text = update.message.text
     user_id = update.message.from_user.id
-    msg = update.message.text.strip()
 
-    if user_id not in ALLOWED_USERS:
-        await update.message.reply_text("❌ Not authorized")
-        return
+    # MAIN MENU
+    if text == "📊 Sales":
+        user_state[user_id] = "sales_location"
 
-    df = load_data()
-
-    if msg == "📊 Sales":
-        user_state[user_id] = {"type": "sales"}
-
-    elif msg == "👨‍💼 Captain":
-        user_state[user_id] = {"type": "captain"}
-
-    elif msg == "👤 Employee Details":
-        await update.message.reply_text("👤 Module coming soon")
-        return
-
-    if msg in ["📊 Sales", "👨‍💼 Captain"]:
-
-        outlets = df["Outlet"].dropna().unique().tolist()
-        keyboard = [[o] for o in outlets]
+        keyboard = [[loc] for loc in LOCATIONS]
+        keyboard.append(["🔙 Back"])
 
         await update.message.reply_text(
-            "📍 Select Location",
+            "Select Location:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
 
-    if user_id in user_state and "location" not in user_state[user_id]:
-        user_state[user_id]["location"] = msg
+    elif text == "👨‍🍳 Captain":
+        user_state[user_id] = "staff_location"
 
-        keyboard = [
-            ["Today", "Yesterday"],
-            ["📅 Custom Date"],
-            ["📆 Month"]
-        ]
+        keyboard = [[loc] for loc in LOCATIONS]
+        keyboard.append(["🔙 Back"])
 
         await update.message.reply_text(
-            "📅 Select Date",
+            "Select Location:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
 
-    if msg == "📅 Custom Date":
-        await update.message.reply_text("Enter DD-MM-YYYY")
+    elif text == "📦 Purchase Info":
+        await update.message.reply_text(
+            "🚧 Purchase Intelligence Engine is being fine-tuned.\nStay tuned for powerful insights!"
+        )
         return
 
-    if msg == "📆 Month":
-        await update.message.reply_text("Enter MM-YYYY")
+    elif text == "📈 P&L":
+        await update.message.reply_text(
+            "📊 Financial Engine warming up...\nP&L dashboards coming soon!"
+        )
         return
 
-    if user_id in user_state:
+    elif text == "👤 Employee Details":
+        await update.message.reply_text(
+            "👤 Employee intelligence system under development 🚧"
+        )
+        return
 
-        state = user_state[user_id]
-        outlet = state.get("location")
+    elif text == "🔙 Back":
+        await start(update, context)
+        return
 
-        if msg == "Today":
-            date_mode = "today"
-        elif msg == "Yesterday":
-            date_mode = "yesterday"
+    # SALES FLOW
+    if user_state.get(user_id) == "sales_location" and text in LOCATIONS:
+        user_state[user_id] = ("sales_date", text)
+
+        keyboard = [["Today", "Yesterday"], ["Custom Date"], ["🔙 Back"]]
+
+        await update.message.reply_text(
+            "Select Date:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+
+    elif isinstance(user_state.get(user_id), tuple) and user_state[user_id][0] == "sales_date":
+        location = user_state[user_id][1]
+
+        if text == "Today":
+            result = sales_location(location, "Today")
+        elif text == "Yesterday":
+            result = sales_location(location, "Yesterday")
+        elif text == "Custom Date":
+            user_state[user_id] = ("custom_date", location)
+            await update.message.reply_text("Enter date (DD-MM-YYYY):")
+            return
         else:
-            date_mode = msg
+            result = "Invalid selection"
 
-        if state["type"] == "sales":
-            result = sales_location(df, outlet, date_mode)
-        else:
-            result = staff_location(df, outlet, date_mode)
+        await update.message.reply_text(result)
+        await start(update, context)
+        return
 
-        await update.message.reply_text(result, reply_markup=main_menu())
+    elif isinstance(user_state.get(user_id), tuple) and user_state[user_id][0] == "custom_date":
+        location = user_state[user_id][1]
+        result = sales_location(location, text)
 
-        user_state.pop(user_id, None)
+        await update.message.reply_text(result)
+        await start(update, context)
+        return
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # STAFF FLOW
+    if user_state.get(user_id) == "staff_location" and text in LOCATIONS:
+        result = staff_location(text)
+        await update.message.reply_text(result)
+        await start(update, context)
+        return
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-print("🤖 Bot Running...")
-app.run_polling()
+# ==============================
+# MAIN (ASYNC FIX FOR PYTHON 3.14)
+# ==============================
+
+async def main():
+    print("🚀 Starting bot...")
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+
+    print("🤖 Bot Running...")
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
