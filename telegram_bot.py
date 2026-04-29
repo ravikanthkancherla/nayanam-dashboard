@@ -1,5 +1,4 @@
 import os
-import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -20,13 +19,13 @@ LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 user_state = {}
 
 # ==============================
-# DUMMY FUNCTIONS (REPLACE WITH YOUR LOGIC)
+# SAMPLE DATA FUNCTIONS (REPLACE WITH REAL LOGIC)
 # ==============================
 
-def sales_location(location, date="today"):
+def sales_location(location, date="Today"):
     return f"""📊 {location} SALES
 
-Date: {date}
+📅 Date: {date}
 
 💰 Total Sales: ₹1,25,000
 🧾 Orders: 320
@@ -71,7 +70,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.message.from_user.id
 
+    # ==============================
     # MAIN MENU
+    # ==============================
+
     if text == "📊 Sales":
         user_state[user_id] = "sales_location"
 
@@ -98,7 +100,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "📦 Purchase Info":
         await update.message.reply_text(
-            "🚧 Purchase Intelligence Engine is being fine-tuned.\nStay tuned for powerful insights!"
+            "🚧 Purchase Intelligence Engine is being fine-tuned.\nStay tuned!"
         )
         return
 
@@ -118,7 +120,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
+    # ==============================
     # SALES FLOW
+    # ==============================
+
     if user_state.get(user_id) == "sales_location" and text in LOCATIONS:
         user_state[user_id] = ("sales_date", text)
 
@@ -142,7 +147,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Enter date (DD-MM-YYYY):")
             return
         else:
-            result = "Invalid selection"
+            return
 
         await update.message.reply_text(result)
         await start(update, context)
@@ -156,7 +161,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
+    # ==============================
     # STAFF FLOW
+    # ==============================
+
     if user_state.get(user_id) == "staff_location" and text in LOCATIONS:
         result = staff_location(text)
         await update.message.reply_text(result)
@@ -165,10 +173,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==============================
-# MAIN (ASYNC FIX FOR PYTHON 3.14)
+# MAIN (FINAL WORKING VERSION)
 # ==============================
 
-async def main():
+if __name__ == "__main__":
     print("🚀 Starting bot...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -177,7 +185,4 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
     print("🤖 Bot Running...")
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    app.run_polling()
