@@ -1,21 +1,15 @@
-import asyncio
+import os
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# =========================
-# HARDCODE TOKEN (TEMP FIX)
-# =========================
-BOT_TOKEN = "PASTE_YOUR_LATEST_TOKEN_HERE"
+BOT_TOKEN = "PASTE_YOUR_TOKEN_HERE"
 
 LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 
-# =========================
-# HANDLERS
-# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [["📊 Sales"]]
     await update.message.reply_text(
-        "📊 Nayanam Bot\nSelect option:",
+        "📊 Nayanam Bot",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
@@ -32,12 +26,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text in LOCATIONS:
         await update.message.reply_text(f"Sales for {text}: ₹1,25,000")
-        return
 
-# =========================
-# MAIN FIX FOR PYTHON 3.14
-# =========================
-async def main():
+if __name__ == "__main__":
     print("🚀 Starting bot...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -47,8 +37,4 @@ async def main():
 
     print("🤖 Bot Running...")
 
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.set_event_loop(asyncio.new_event_loop())  # CRITICAL FIX
-    asyncio.run(main())
+    app.run_polling()
