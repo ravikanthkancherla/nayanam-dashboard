@@ -1,17 +1,13 @@
 import os
-from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # =========================
-# LOAD ENV
+# TOKEN
 # =========================
-load_dotenv()
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-BOT_TOKEN = os.environ.get("8736434524:AAFM9KbwzLOZWQrr3qCsWLQ2KBLquCm0sTs")
-
-if not BOT_TOKEN:
-    print("⚠️ BOT_TOKEN missing")
+print("TOKEN:", BOT_TOKEN)  # DEBUG LINE
 
 # =========================
 # DATA
@@ -55,5 +51,4 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
     print("🤖 Bot Running...")
-
     app.run_polling(drop_pending_updates=True)
