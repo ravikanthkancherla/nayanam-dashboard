@@ -5,7 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 # =========================
 # CONFIG
 # =========================
-BOT_TOKEN = os.environ.get("8736434524:AAHFEkTBEFpRHE0R4wV0ZlLgWKA2FSkOy6Y")
+BOT_TOKEN = os.environ.get("8736434524:AAFM9KbwzLOZWQrr3qCsWLQ2KBLquCm0sTs")
 
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN not found in environment variables")
