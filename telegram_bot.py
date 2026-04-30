@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -8,8 +10,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 BOT_TOKEN = os.environ.get("8736434524:AAFM9KbwzLOZWQrr3qCsWLQ2KBLquCm0sTs")
 
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN not found in environment variables")
-
+if not BOT_TOKEN:
+    print("⚠️ BOT_TOKEN missing")
 print("✅ TOKEN LOADED")
 
 LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]

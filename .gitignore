@@ -3,3 +3,5 @@ __pycache__/
 .gradio/
 *.pdf
 ~$*
+ai_query_tool.py
+ai_assistant.py
