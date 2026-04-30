@@ -1,17 +1,22 @@
 import os
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # =========================
-# TOKEN
+# CONFIG
 # =========================
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+RENDER_URL = os.environ.get("RENDER_URL")  # Example: https://nayanam-telegram-bot.onrender.com
 
-print("TOKEN:", BOT_TOKEN)  # DEBUG LINE
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN missing")
+if not RENDER_URL:
+    raise ValueError("❌ RENDER_URL missing")
 
-# =========================
-# DATA
-# =========================
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
+
 LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 
 # =========================
@@ -20,8 +25,8 @@ LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [["📊 Sales"]]
     await update.message.reply_text(
-        "📊 Nayanam Bot",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        "📊 Nayanam Bot\nSelect option:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
     )
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,7 +36,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[loc] for loc in LOCATIONS]
         await update.message.reply_text(
             "Select Location:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         )
         return
 
@@ -42,13 +47,25 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # MAIN
 # =========================
-if __name__ == "__main__":
-    print("🚀 Starting bot...")
+async def main():
+    print("🚀 Starting webhook bot...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-    print("🤖 Bot Running...")
-    app.run_polling(drop_pending_updates=True)
+    # Set webhook
+    await app.bot.set_webhook(WEBHOOK_URL)
+    print(f"🔗 Webhook set: {WEBHOOK_URL}")
+
+    # Start server
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
+        url_path=WEBHOOK_PATH,
+        webhook_url=WEBHOOK_URL,
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
