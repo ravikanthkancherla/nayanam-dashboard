@@ -1,20 +1,11 @@
-import os
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # =========================
-# CONFIG
+# HARDCODE TOKEN (TEMP FIX)
 # =========================
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-RENDER_URL = os.environ.get("RENDER_URL")  # e.g. https://nayanam-telegram-bot.onrender.com
-
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN missing")
-if not RENDER_URL:
-    raise ValueError("RENDER_URL missing")
-
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
+BOT_TOKEN = "PASTE_YOUR_LATEST_TOKEN_HERE"
 
 LOCATIONS = ["KOTHAPET", "BEGUMPET", "ASRAO", "ABIDS", "EAT STREET"]
 
@@ -44,24 +35,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # =========================
-# MAIN (WEBHOOK MODE)
+# MAIN FIX FOR PYTHON 3.14
 # =========================
-if __name__ == "__main__":
-    print("🚀 Starting webhook bot...")
+async def main():
+    print("🚀 Starting bot...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-    print(f"🔗 Setting webhook: {WEBHOOK_URL}")
-    app.bot.set_webhook(WEBHOOK_URL)
-
     print("🤖 Bot Running...")
 
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        url_path=WEBHOOK_PATH,
-        webhook_url=WEBHOOK_URL,
-    )
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.set_event_loop(asyncio.new_event_loop())  # CRITICAL FIX
+    asyncio.run(main())
